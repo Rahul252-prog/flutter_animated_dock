@@ -93,15 +93,16 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
       alignment: Alignment.bottomCenter,
       child: AnimatedContainer(
         duration: Duration(milliseconds: 200),
-        height: 120,
+        padding: EdgeInsets.all(10),
+        // height: 105,
         margin: EdgeInsets.only(bottom: 30),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.3),
           borderRadius: BorderRadius.circular(30),
         ),
         width: hoveredIndex != null
-            ? (appIcons.length * 130.0)
-            : (appIcons.length * 120.0),
+            ? (appIcons.length * 110.0)
+            : (appIcons.length * 100.0),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final itemWidth = constraints.maxWidth / appIcons.length;
