@@ -23,16 +23,6 @@ class AppDock extends StatefulWidget {
 }
 
 class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
-  // final List<IconData> appIcons = [
-  //   Icons.home,
-  //   Icons.work,
-  //   Icons.settings,
-  //   Icons.favorite,
-  //   Icons.person,
-  //   Icons.ac_unit,
-  //   Icons.accessible,
-  //   Icons.access_alarm,
-  // ];
 
   final List<String> appIcons = [
     'assets/icons/App Icon Finder.png',

@@ -170,10 +170,10 @@
       "languageVersion": "3.6"
     }
   ],
-  "generated": "2025-02-04T04:07:10.622330Z",
+  "generated": "2025-02-11T10:27:33.716883Z",
   "generator": "pub",
-  "generatorVersion": "3.6.0",
+  "generatorVersion": "3.6.2",
   "flutterRoot": "file:///Users/akashptl/src/flutter",
-  "flutterVersion": "3.27.0",
+  "flutterVersion": "3.27.4",
   "pubCache": "file:///Users/akashptl/.pub-cache"
 }
