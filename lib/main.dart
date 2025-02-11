@@ -37,17 +37,27 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
   Offset? dragOffset;
   final GlobalKey _dockKey = GlobalKey();
 
+  // double getScaleForIndex(int index) {
+  //   if (selectedIndex != null) {
+  //     return index == selectedIndex ? 1.0 : 1.05;
+  //   }
+  //
+  //   if (hoveredIndex == null) return 1.0;
+  //
+  //   final distance = (hoveredIndex! - index).abs();
+  //   if (distance == 0) return 1.2;
+  //   if (distance == 1) return 1.1;
+  //   return 1.0;
+  // }
   double getScaleForIndex(int index) {
-    if (selectedIndex != null) {
-      return index == selectedIndex ? 1.0 : 1.05;
-    }
-
     if (hoveredIndex == null) return 1.0;
 
     final distance = (hoveredIndex! - index).abs();
-    if (distance == 0) return 1.2;
-    if (distance == 1) return 1.1;
-    return 1.0;
+
+    if (distance == 0) return 1.2; // Fully hovered icon
+    if (distance == 1) return 1.1; // Adjacent icon
+    if (distance == 2) return 1; // Two icons away
+    return 1.0; // Default scale for farther icons
   }
 
   @override
@@ -96,8 +106,9 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                         ),
                       ),
                       childWhenDragging: Opacity(
-                        opacity: 0.5,
-                        child: Image.asset(iconPath),
+                        opacity: 0,
+                        child: Image.asset(iconPath,  height: 100,
+                          width: 100,),
                       ),
                       onDragStarted: () => setState(() => selectedIndex = index),
                       onDragEnd: (details) {
@@ -155,14 +166,14 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                         }),
                         builder: (context, candidateData, rejectedData) {
                           final scale = getScaleForIndex(index);
-                          final translateY = selectedIndex == index ? -20.0 : 0.0;
+                          final translateY = hoveredIndex != null ? -10 * (scale - 1.0) : 0.0;
                           final translateX = iconOffsets[index]?.dx ?? 0.0;
 
                           return AnimatedContainer(
                             duration: Duration(milliseconds: 200),
                             curve: Curves.easeOutCubic,
                             transform: Matrix4.identity()
-                              ..translate(translateX, translateY)
+                              ..translate(translateX, translateY) // Move icons up instead of down
                               ..scale(scale),
                             child: Container(
                               height: 85,
@@ -171,6 +182,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                               child: Image.asset(iconPath),
                             ),
                           );
+
                         },
                       ),
                     ),
