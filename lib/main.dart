@@ -166,7 +166,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                         }),
                         builder: (context, candidateData, rejectedData) {
                           final scale = getScaleForIndex(index);
-                          final translateY = hoveredIndex != null ? -10 * (scale - 1.0) : 0.0;
+                          final translateY = hoveredIndex != null ? -30 * (scale - 1.0) : 0.0;
                           final translateX = iconOffsets[index]?.dx ?? 0.0;
 
                           return AnimatedContainer(
