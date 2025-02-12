@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -23,7 +24,7 @@ class AppDock extends StatefulWidget {
 }
 
 class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
-  final List<String> appIcons = [
+  List<String> appIcons = [
     'assets/icons/App Icon Finder.png',
     'assets/icons/Apple Design Resources Bitmap.png',
     'assets/icons/Mail App Icon.png',
@@ -36,16 +37,22 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
   Map<int, Offset> iconOffsets = {};
   final GlobalKey _dockKey = GlobalKey();
   final GlobalKey _scaffoldKey = GlobalKey();
+  String? draggedIcon;
 
-  double getScaleForIndex(int index) {
-    if (hoveredIndex == null) return 1.0;
+  // Hover animation logic
+  double getScale(int index) {
+    if (hoveredIndex == null || selectedIndex != null) return 1.0;
+    final distance = (index - hoveredIndex!).abs();
+    return 1.0 + 0.3 / (distance + 1);
+  }
 
-    final distance = (hoveredIndex! - index).abs();
-
-    if (distance == 0) return 1.1; // Fully hovered icon
-    if (distance == 1) return 1.05; // Adjacent icon
-    if (distance == 2) return 1.02; // Two icons away
-    return 1.0; // Default scale for farther icons
+  double getTranslateX(int index) {
+    if (hoveredIndex == null || selectedIndex != null) return 0.0;
+    final distance = index - hoveredIndex!;
+    if (distance == 0) return 0.0;
+    final direction = distance.sign.toDouble();
+    final maxTranslation = 35.0;
+    return direction * maxTranslation * pow(0.6, distance.abs());
   }
 
   @override
@@ -57,7 +64,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
         alignment: Alignment.bottomCenter,
         child: AnimatedContainer(
           key: _dockKey,
-          duration: Duration(milliseconds: 200),
+          duration: Duration(milliseconds: 300),
           padding: EdgeInsets.all(10),
           margin: EdgeInsets.only(bottom: 30),
           decoration: BoxDecoration(
@@ -94,61 +101,76 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        childWhenDragging: Opacity(
-                          opacity: 0,
-                          child: Image.asset(iconPath, height: 100, width: 100),
-                        ),
+                        childWhenDragging: Container(),
                         onDragStarted: () {
                           setState(() {
                             selectedIndex = index;
+                            draggedIcon = appIcons[index];
+                            appIcons.removeAt(index);
+                            hoveredIndex =
+                                null; // Reset hover when dragging starts
                           });
                         },
+
                         onDragUpdate: (details) {
+
                           final RenderBox scaffoldBox =
-                          _scaffoldKey.currentContext?.findRenderObject() as RenderBox;
+                              _scaffoldKey.currentContext?.findRenderObject()
+                                  as RenderBox;
                           final Offset globalPosition = details.globalPosition;
                           final Rect scaffoldRect = Rect.fromPoints(
                               scaffoldBox.localToGlobal(Offset.zero),
-                              scaffoldBox.localToGlobal(Offset(scaffoldBox.size.width, scaffoldBox.size.height))
-                          );
+                              scaffoldBox.localToGlobal(Offset(
+                                  scaffoldBox.size.width,
+                                  scaffoldBox.size.height)));
 
                           if (!scaffoldRect.contains(globalPosition)) {
-                            setState(() {
-                              appIcons.removeAt(index);
-                            });
+
+                            draggedIcon = appIcons[index];
+
+                            appIcons.insert(index, draggedIcon!);
+
+                            // Handle dragging outside if needed
                           }
                         },
                         onDragEnd: (details) {
+                          print('asdasd');
                           setState(() {
+                            if (draggedIcon != null) {
+                              appIcons.insert(selectedIndex!, draggedIcon!);
+                              draggedIcon = null;
+                            }
                             selectedIndex = null;
                           });
                         },
                         child: DragTarget<int>(
                           onWillAccept: (data) => true,
                           onAccept: (draggedIndex) {
-                            final draggedIcon = appIcons[draggedIndex];
+
                             setState(() {
-                              appIcons.removeAt(draggedIndex);
-                              appIcons.insert(index, draggedIcon);
+                              if (draggedIcon != null) {
+                                appIcons.insert(index, draggedIcon!);
+                                draggedIcon = null;
+                              }
                               hoveredIndex = null;
                             });
                           },
                           onMove: (details) {
                             final RenderBox box =
-                            context.findRenderObject() as RenderBox;
+                                context.findRenderObject() as RenderBox;
                             final localPos = box.globalToLocal(details.offset);
-
                             setState(() {
                               hoveredIndex = index;
                               if (selectedIndex != null) {
-                                final direction = selectedIndex! < index ? -1 : 1;
+                                final direction =
+                                    selectedIndex! < index ? -1 : 1;
                                 for (int i = 0; i < appIcons.length; i++) {
                                   iconOffsets[i] = (selectedIndex! < index &&
-                                      i > selectedIndex! &&
-                                      i <= index) ||
-                                      (selectedIndex! > index &&
-                                          i < selectedIndex! &&
-                                          i >= index)
+                                              i > selectedIndex! &&
+                                              i <= index) ||
+                                          (selectedIndex! > index &&
+                                              i < selectedIndex! &&
+                                              i >= index)
                                       ? Offset(direction * itemWidth, 0)
                                       : Offset.zero;
                                 }
@@ -160,14 +182,16 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                             iconOffsets.clear();
                           }),
                           builder: (context, candidateData, rejectedData) {
-                            final scale = getScaleForIndex(index);
-                            final translateY = 0.0; // Keep bottom fixed
-                            final translateX = iconOffsets[index]?.dx ?? 0.0;
+                            final scale = getScale(index);
+                            final translateX = getTranslateX(index);
 
-                            return Transform(
+                            return AnimatedContainer(
+                              height: 90,
+                              duration: Duration(milliseconds: 300),
+                              curve: Curves.easeOutExpo,
                               transform: Matrix4.identity()
                                 ..translate(translateX, 0)
-                                ..translate(0.0, (1 - scale) * 85.0) // Anchor scaling from bottom
+                                ..translate(0.0, (1 - scale) * 40)
                                 ..scale(scale),
                               alignment: Alignment.bottomCenter,
                               child: Container(
