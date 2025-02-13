@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 
@@ -38,6 +39,30 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
   final GlobalKey _dockKey = GlobalKey();
   final GlobalKey _scaffoldKey = GlobalKey();
   String? draggedIcon;
+  bool isDraggingOutside = false;
+  Offset? lastDragPosition;
+
+  void _logDragEvent(String event, {Map<String, dynamic>? details}) {
+    try {
+      String logMessage = '📱 Dock Event: $event';
+      if (details != null) {
+        logMessage += ' | Details: ${details.toString()}';
+      }
+      debugPrint(logMessage);
+      stderr.writeln(logMessage);
+    } catch (e) {
+      debugPrint('Error in logging: $e');
+    }
+  }
+
+  void _safePrint(String message) {
+    try {
+      debugPrint('🔍 DEBUG: $message');
+      stderr.writeln('🔍 DEBUG: $message');
+    } catch (e) {
+      print('Basic print fallback: $message');
+    }
+  }
 
   // Hover animation logic
   double getScale(int index) {
@@ -55,160 +80,197 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
     return direction * maxTranslation * pow(0.6, distance.abs());
   }
 
+  bool isPositionOutsideDock(Offset position, BuildContext context) {
+    final RenderBox dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox;
+    final Offset dockPosition = dockBox.localToGlobal(Offset.zero);
+    final Size dockSize = dockBox.size;
+
+    final dockRect = Rect.fromLTWH(
+      dockPosition.dx,
+      dockPosition.dy,
+      dockSize.width,
+      dockSize.height,
+    );
+
+    return !dockRect.contains(position);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.deepPurpleAccent,
-      body: Align(
-        alignment: Alignment.bottomCenter,
-        child: AnimatedContainer(
-          key: _dockKey,
-          duration: Duration(milliseconds: 300),
-          padding: EdgeInsets.all(10),
-          margin: EdgeInsets.only(bottom: 30),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          width: appIcons.length * 100.0,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final itemWidth = constraints.maxWidth / appIcons.length;
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(appIcons.length, (index) {
-                  final iconPath = appIcons[index];
-                  return MouseRegion(
-                    key: ValueKey(iconPath),
-                    onEnter: (_) => setState(() => hoveredIndex = index),
-                    onExit: (_) => setState(() => hoveredIndex = null),
-                    child: SizedBox(
-                      width: itemWidth,
-                      child: LongPressDraggable<int>(
-                        delay: Duration(milliseconds: 200),
-                        data: index,
-                        feedback: Material(
-                          color: Colors.transparent,
-                          child: Container(
-                            width: itemWidth,
-                            height: 100,
-                            alignment: Alignment.center,
-                            child: Image.asset(
-                              iconPath,
+      // Wrap the entire scaffold with a drag target to handle out-of-bounds drops
+      body: DragTarget<int>(
+        onWillAccept: (data) => true,
+        onAccept: (data) {
+          _safePrint('Drop detected on scaffold');
+          if (draggedIcon != null && selectedIndex != null) {
+            setState(() {
+              appIcons.insert(selectedIndex!, draggedIcon!);
+              _logDragEvent('Out of Bounds Drop', details: {
+                'icon': draggedIcon,
+                'originalIndex': selectedIndex,
+                'position': lastDragPosition.toString()
+              });
+              draggedIcon = null;
+              selectedIndex = null;
+              isDraggingOutside = false;
+            });
+          }
+        },
+        builder: (context, candidateData, rejectedData) => Align(
+          alignment: Alignment.bottomCenter,
+          child: AnimatedContainer(
+            key: _dockKey,
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.all(10),
+            margin: EdgeInsets.only(bottom: 30),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            width: appIcons.length * 100.0,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / appIcons.length;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(appIcons.length, (index) {
+                    final iconPath = appIcons[index];
+                    return MouseRegion(
+                      key: ValueKey(iconPath),
+                      onEnter: (_) => setState(() => hoveredIndex = index),
+                      onExit: (_) => setState(() => hoveredIndex = null),
+                      child: SizedBox(
+                        width: itemWidth,
+                        child: LongPressDraggable<int>(
+                          delay: Duration(milliseconds: 200),
+                          data: index,
+                          feedback: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              width: itemWidth,
                               height: 100,
-                              width: 100,
+                              alignment: Alignment.center,
+                              child: Image.asset(
+                                iconPath,
+                                height: 100,
+                                width: 100,
+                              ),
                             ),
                           ),
-                        ),
-                        childWhenDragging: Container(),
-                        onDragStarted: () {
-                          setState(() {
-                            selectedIndex = index;
-                            draggedIcon = appIcons[index];
-                            appIcons.removeAt(index);
-                            hoveredIndex =
-                                null; // Reset hover when dragging starts
-                          });
-                        },
-
-                        onDragUpdate: (details) {
-
-                          final RenderBox scaffoldBox =
-                              _scaffoldKey.currentContext?.findRenderObject()
-                                  as RenderBox;
-                          final Offset globalPosition = details.globalPosition;
-                          final Rect scaffoldRect = Rect.fromPoints(
-                              scaffoldBox.localToGlobal(Offset.zero),
-                              scaffoldBox.localToGlobal(Offset(
-                                  scaffoldBox.size.width,
-                                  scaffoldBox.size.height)));
-
-                          if (!scaffoldRect.contains(globalPosition)) {
-
-                            draggedIcon = appIcons[index];
-
-                            appIcons.insert(index, draggedIcon!);
-
-                            // Handle dragging outside if needed
-                          }
-                        },
-                        onDragEnd: (details) {
-                          print('asdasd');
-                          setState(() {
-                            if (draggedIcon != null) {
-                              appIcons.insert(selectedIndex!, draggedIcon!);
-                              draggedIcon = null;
-                            }
-                            selectedIndex = null;
-                          });
-                        },
-                        child: DragTarget<int>(
-                          onWillAccept: (data) => true,
-                          onAccept: (draggedIndex) {
-
+                          childWhenDragging: Container(),
+                          onDragStarted: () {
+                            _safePrint('Starting drag for index $index');
                             setState(() {
-                              if (draggedIcon != null) {
-                                appIcons.insert(index, draggedIcon!);
-                                draggedIcon = null;
-                              }
+                              selectedIndex = index;
+                              draggedIcon = appIcons[index];
+                              appIcons.removeAt(index);
                               hoveredIndex = null;
                             });
                           },
-                          onMove: (details) {
-                            final RenderBox box =
-                                context.findRenderObject() as RenderBox;
-                            final localPos = box.globalToLocal(details.offset);
-                            setState(() {
-                              hoveredIndex = index;
-                              if (selectedIndex != null) {
-                                final direction =
-                                    selectedIndex! < index ? -1 : 1;
-                                for (int i = 0; i < appIcons.length; i++) {
-                                  iconOffsets[i] = (selectedIndex! < index &&
-                                              i > selectedIndex! &&
-                                              i <= index) ||
-                                          (selectedIndex! > index &&
-                                              i < selectedIndex! &&
-                                              i >= index)
-                                      ? Offset(direction * itemWidth, 0)
-                                      : Offset.zero;
-                                }
-                              }
-                            });
-                          },
-                          onLeave: (data) => setState(() {
-                            hoveredIndex = null;
-                            iconOffsets.clear();
-                          }),
-                          builder: (context, candidateData, rejectedData) {
-                            final scale = getScale(index);
-                            final translateX = getTranslateX(index);
+                          onDragUpdate: (details) {
+                            lastDragPosition = details.globalPosition;
+                            final isOutside = isPositionOutsideDock(details.globalPosition, context);
 
-                            return AnimatedContainer(
-                              height: 90,
-                              duration: Duration(milliseconds: 300),
-                              curve: Curves.easeOutExpo,
-                              transform: Matrix4.identity()
-                                ..translate(translateX, 0)
-                                ..translate(0.0, (1 - scale) * 40)
-                                ..scale(scale),
-                              alignment: Alignment.bottomCenter,
-                              child: Container(
-                                height: 85,
-                                width: 85,
-                                alignment: Alignment.center,
-                                child: Image.asset(iconPath),
-                              ),
-                            );
+                            if (isOutside != isDraggingOutside) {
+                              setState(() {
+                                isDraggingOutside = isOutside;
+                              });
+                              _logDragEvent('Drag Location Update', details: {
+                                'isOutside': isOutside,
+                                'position': details.globalPosition.toString(),
+                                'icon': draggedIcon
+                              });
+                            }
                           },
+                          onDragEnd: (details) {
+                            _safePrint('Drag ended at ${details.offset}');
+                            _logDragEvent('Drag Ended', details: {
+                              'position': details.offset.toString(),
+                              'isOutside': isDraggingOutside,
+                              'icon': draggedIcon,
+                              'selectedIndex': selectedIndex
+                            });
+
+                            if (isDraggingOutside) {
+                              setState(() {
+                                if (draggedIcon != null && selectedIndex != null) {
+                                  appIcons.insert(selectedIndex!, draggedIcon!);
+                                  draggedIcon = null;
+                                  selectedIndex = null;
+                                }
+                                isDraggingOutside = false;
+                              });
+                            }
+                          },
+                          child: DragTarget<int>(
+                            onWillAccept: (data) => true,
+                            onAccept: (draggedIndex) {
+                              _safePrint('Drop accepted at index $index');
+                              setState(() {
+                                if (draggedIcon != null) {
+                                  appIcons.insert(index, draggedIcon!);
+                                  draggedIcon = null;
+                                }
+                                hoveredIndex = null;
+                                isDraggingOutside = false;
+                              });
+                            },
+                            onMove: (details) {
+                              final RenderBox box = context.findRenderObject() as RenderBox;
+                              final localPos = box.globalToLocal(details.offset);
+                              setState(() {
+                                hoveredIndex = index;
+                                if (selectedIndex != null) {
+                                  final direction = selectedIndex! < index ? -1 : 1;
+                                  for (int i = 0; i < appIcons.length; i++) {
+                                    iconOffsets[i] = (selectedIndex! < index &&
+                                        i > selectedIndex! &&
+                                        i <= index) ||
+                                        (selectedIndex! > index &&
+                                            i < selectedIndex! &&
+                                            i >= index)
+                                        ? Offset(direction * itemWidth, 0)
+                                        : Offset.zero;
+                                  }
+                                }
+                              });
+                            },
+                            onLeave: (data) => setState(() {
+                              hoveredIndex = null;
+                              iconOffsets.clear();
+                            }),
+                            builder: (context, candidateData, rejectedData) {
+                              final scale = getScale(index);
+                              final translateX = getTranslateX(index);
+
+                              return AnimatedContainer(
+                                height: 90,
+                                duration: Duration(milliseconds: 300),
+                                curve: Curves.easeOutExpo,
+                                transform: Matrix4.identity()
+                                  ..translate(translateX, 0)
+                                  ..translate(0.0, (1 - scale) * 40)
+                                  ..scale(scale),
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  height: 85,
+                                  width: 85,
+                                  alignment: Alignment.center,
+                                  child: Image.asset(iconPath),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              );
-            },
+                    );
+                  }),
+                );
+              },
+            ),
           ),
         ),
       ),
