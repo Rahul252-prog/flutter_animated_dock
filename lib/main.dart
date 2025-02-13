@@ -81,7 +81,8 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
   }
 
   bool isPositionOutsideDock(Offset position, BuildContext context) {
-    final RenderBox dockBox = _dockKey.currentContext?.findRenderObject() as RenderBox;
+    final RenderBox dockBox =
+        _dockKey.currentContext?.findRenderObject() as RenderBox;
     final Offset dockPosition = dockBox.localToGlobal(Offset.zero);
     final Size dockSize = dockBox.size;
 
@@ -100,7 +101,6 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.deepPurpleAccent,
-      // Wrap the entire scaffold with a drag target to handle out-of-bounds drops
       body: DragTarget<int>(
         onWillAccept: (data) => true,
         onAccept: (data) {
@@ -116,6 +116,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
               draggedIcon = null;
               selectedIndex = null;
               isDraggingOutside = false;
+              hoveredIndex = null; // Reset hover state
             });
           }
         },
@@ -131,6 +132,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(30),
             ),
             width: appIcons.length * 100.0,
+            height: 110,
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final itemWidth = constraints.maxWidth / appIcons.length;
@@ -139,8 +141,13 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                   children: List.generate(appIcons.length, (index) {
                     final iconPath = appIcons[index];
                     return MouseRegion(
-                      key: ValueKey(iconPath),
-                      onEnter: (_) => setState(() => hoveredIndex = index),
+                      key: ValueKey('$iconPath-$index'), // Updated key
+                      onEnter: (_) {
+                        if (!isDraggingOutside && draggedIcon == null) {
+                          // Only allow hover when not dragging
+                          setState(() => hoveredIndex = index);
+                        }
+                      },
                       onExit: (_) => setState(() => hoveredIndex = null),
                       child: SizedBox(
                         width: itemWidth,
@@ -166,15 +173,18 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                             setState(() {
                               selectedIndex = index;
                               draggedIcon = appIcons[index];
-                              appIcons.removeAt(index);
-                              hoveredIndex = null;
+                              // appIcons.removeAt(index);
+                              hoveredIndex =
+                                  null; // Reset hover state when drag starts
                             });
                           },
                           onDragUpdate: (details) {
                             lastDragPosition = details.globalPosition;
-                            final isOutside = isPositionOutsideDock(details.globalPosition, context);
+                            final isOutside = isPositionOutsideDock(
+                                details.globalPosition, context);
 
                             if (isOutside != isDraggingOutside) {
+                              appIcons.removeAt(index);
                               setState(() {
                                 isDraggingOutside = isOutside;
                               });
@@ -194,16 +204,18 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                               'selectedIndex': selectedIndex
                             });
 
-                            if (isDraggingOutside) {
-                              setState(() {
-                                if (draggedIcon != null && selectedIndex != null) {
-                                  appIcons.insert(selectedIndex!, draggedIcon!);
-                                  draggedIcon = null;
-                                  selectedIndex = null;
-                                }
-                                isDraggingOutside = false;
-                              });
-                            }
+                            setState(() {
+                              if (isDraggingOutside &&
+                                  draggedIcon != null &&
+                                  selectedIndex != null) {
+                                appIcons.insert(selectedIndex!, draggedIcon!);
+                                draggedIcon = null;
+                                selectedIndex = null;
+                              }
+                              isDraggingOutside = false;
+                              hoveredIndex =
+                                  null; // Reset hover state when drag ends
+                            });
                           },
                           child: DragTarget<int>(
                             onWillAccept: (data) => true,
@@ -213,25 +225,29 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                                 if (draggedIcon != null) {
                                   appIcons.insert(index, draggedIcon!);
                                   draggedIcon = null;
+                                  selectedIndex = null; // Reset selected index
                                 }
-                                hoveredIndex = null;
+                                hoveredIndex = null; // Reset hover state
                                 isDraggingOutside = false;
                               });
                             },
                             onMove: (details) {
-                              final RenderBox box = context.findRenderObject() as RenderBox;
-                              final localPos = box.globalToLocal(details.offset);
+                              final RenderBox box =
+                                  context.findRenderObject() as RenderBox;
+                              final localPos =
+                                  box.globalToLocal(details.offset);
                               setState(() {
                                 hoveredIndex = index;
                                 if (selectedIndex != null) {
-                                  final direction = selectedIndex! < index ? -1 : 1;
+                                  final direction =
+                                      selectedIndex! < index ? -1 : 1;
                                   for (int i = 0; i < appIcons.length; i++) {
                                     iconOffsets[i] = (selectedIndex! < index &&
-                                        i > selectedIndex! &&
-                                        i <= index) ||
-                                        (selectedIndex! > index &&
-                                            i < selectedIndex! &&
-                                            i >= index)
+                                                i > selectedIndex! &&
+                                                i <= index) ||
+                                            (selectedIndex! > index &&
+                                                i < selectedIndex! &&
+                                                i >= index)
                                         ? Offset(direction * itemWidth, 0)
                                         : Offset.zero;
                                   }
