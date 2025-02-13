@@ -203,7 +203,6 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                               'icon': draggedIcon,
                               'selectedIndex': selectedIndex
                             });
-
                             setState(() {
                               if (isDraggingOutside &&
                                   draggedIcon != null &&
@@ -213,8 +212,7 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                                 selectedIndex = null;
                               }
                               isDraggingOutside = false;
-                              hoveredIndex =
-                                  null; // Reset hover state when drag ends
+                              hoveredIndex = null;
                             });
                           },
                           child: DragTarget<int>(
@@ -222,12 +220,13 @@ class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
                             onAccept: (draggedIndex) {
                               _safePrint('Drop accepted at index $index');
                               setState(() {
+                                appIcons.removeAt(selectedIndex!);
                                 if (draggedIcon != null) {
                                   appIcons.insert(index, draggedIcon!);
                                   draggedIcon = null;
-                                  selectedIndex = null; // Reset selected index
+                                  selectedIndex = null;
                                 }
-                                hoveredIndex = null; // Reset hover state
+                                hoveredIndex = null;
                                 isDraggingOutside = false;
                               });
                             },
