@@ -1,294 +1,239 @@
-import 'dart:io';
-import 'dart:math';
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.deepPurpleAccent,
-        body: AppDock(),
-      ),
+      home: HomePage(),
     );
   }
 }
 
-class AppDock extends StatefulWidget {
-  @override
-  _AppDockState createState() => _AppDockState();
-}
-
-class _AppDockState extends State<AppDock> with TickerProviderStateMixin {
-  List<String> appIcons = [
-    'assets/icons/App Icon Finder.png',
-    'assets/icons/Apple Design Resources Bitmap.png',
-    'assets/icons/Mail App Icon.png',
-    'assets/icons/Swift Playgrounds App Icon.png',
-    'assets/icons/System Preferences App Icon.png'
-  ];
-
-  int? selectedIndex;
-  int? hoveredIndex;
-  Map<int, Offset> iconOffsets = {};
-  final GlobalKey _dockKey = GlobalKey();
-  final GlobalKey _scaffoldKey = GlobalKey();
-  String? draggedIcon;
-  bool isDraggingOutside = false;
-  Offset? lastDragPosition;
-
-  void _logDragEvent(String event, {Map<String, dynamic>? details}) {
-    try {
-      String logMessage = '📱 Dock Event: $event';
-      if (details != null) {
-        logMessage += ' | Details: ${details.toString()}';
-      }
-      debugPrint(logMessage);
-      stderr.writeln(logMessage);
-    } catch (e) {
-      debugPrint('Error in logging: $e');
-    }
-  }
-
-  void _safePrint(String message) {
-    try {
-      debugPrint('🔍 DEBUG: $message');
-      stderr.writeln('🔍 DEBUG: $message');
-    } catch (e) {
-      print('Basic print fallback: $message');
-    }
-  }
-
-  // Hover animation logic
-  double getScale(int index) {
-    if (hoveredIndex == null || selectedIndex != null) return 1.0;
-    final distance = (index - hoveredIndex!).abs();
-    return 1.0 + 0.3 / (distance + 1);
-  }
-
-  double getTranslateX(int index) {
-    if (hoveredIndex == null || selectedIndex != null) return 0.0;
-    final distance = index - hoveredIndex!;
-    if (distance == 0) return 0.0;
-    final direction = distance.sign.toDouble();
-    final maxTranslation = 35.0;
-    return direction * maxTranslation * pow(0.6, distance.abs());
-  }
-
-  bool isPositionOutsideDock(Offset position, BuildContext context) {
-    final RenderBox dockBox =
-        _dockKey.currentContext?.findRenderObject() as RenderBox;
-    final Offset dockPosition = dockBox.localToGlobal(Offset.zero);
-    final Size dockSize = dockBox.size;
-
-    final dockRect = Rect.fromLTWH(
-      dockPosition.dx,
-      dockPosition.dy,
-      dockSize.width,
-      dockSize.height,
-    );
-
-    return !dockRect.contains(position);
-  }
+class HomePage extends StatelessWidget {
+  const HomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
       backgroundColor: Colors.deepPurpleAccent,
-      body: DragTarget<int>(
-        onWillAccept: (data) => true,
-        onAccept: (data) {
-          _safePrint('Drop detected on scaffold');
-          if (draggedIcon != null && selectedIndex != null) {
-            setState(() {
-              appIcons.insert(selectedIndex!, draggedIcon!);
-              _logDragEvent('Out of Bounds Drop', details: {
-                'icon': draggedIcon,
-                'originalIndex': selectedIndex,
-                'position': lastDragPosition.toString()
-              });
-              draggedIcon = null;
-              selectedIndex = null;
-              isDraggingOutside = false;
-              hoveredIndex = null; // Reset hover state
-            });
-          }
-        },
-        builder: (context, candidateData, rejectedData) => Align(
-          alignment: Alignment.bottomCenter,
-          child: AnimatedContainer(
-            key: _dockKey,
-            duration: Duration(milliseconds: 300),
-            padding: EdgeInsets.all(10),
-            margin: EdgeInsets.only(bottom: 30),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(30),
-            ),
-            width: appIcons.length * 100.0,
-            height: 110,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final itemWidth = constraints.maxWidth / appIcons.length;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(appIcons.length, (index) {
-                    final iconPath = appIcons[index];
-                    return MouseRegion(
-                      key: ValueKey('$iconPath-$index'), // Updated key
-                      onEnter: (_) {
-                        if (!isDraggingOutside && draggedIcon == null) {
-                          // Only allow hover when not dragging
-                          setState(() => hoveredIndex = index);
-                        }
-                      },
-                      onExit: (_) => setState(() => hoveredIndex = null),
-                      child: SizedBox(
-                        width: itemWidth,
-                        child: LongPressDraggable<int>(
-                          delay: Duration(milliseconds: 200),
-                          data: index,
-                          feedback: Material(
-                            color: Colors.transparent,
-                            child: Container(
-                              width: itemWidth,
-                              height: 100,
-                              alignment: Alignment.center,
-                              child: Image.asset(
-                                iconPath,
-                                height: 100,
-                                width: 100,
-                              ),
-                            ),
-                          ),
-                          childWhenDragging: Container(),
-                          onDragStarted: () {
-                            _safePrint('Starting drag for index $index');
-                            setState(() {
-                              selectedIndex = index;
-                              draggedIcon = appIcons[index];
-                              // appIcons.removeAt(index);
-                              hoveredIndex =
-                                  null; // Reset hover state when drag starts
-                            });
-                          },
-                          onDragUpdate: (details) {
-                            lastDragPosition = details.globalPosition;
-                            final isOutside = isPositionOutsideDock(
-                                details.globalPosition, context);
-
-                            if (isOutside != isDraggingOutside) {
-                              appIcons.removeAt(index);
-                              setState(() {
-                                isDraggingOutside = isOutside;
-                              });
-                              _logDragEvent('Drag Location Update', details: {
-                                'isOutside': isOutside,
-                                'position': details.globalPosition.toString(),
-                                'icon': draggedIcon
-                              });
-                            }
-                          },
-                          onDragEnd: (details) {
-                            _safePrint('Drag ended at ${details.offset}');
-                            _logDragEvent('Drag Ended', details: {
-                              'position': details.offset.toString(),
-                              'isOutside': isDraggingOutside,
-                              'icon': draggedIcon,
-                              'selectedIndex': selectedIndex
-                            });
-                            setState(() {
-                              if (isDraggingOutside &&
-                                  draggedIcon != null &&
-                                  selectedIndex != null) {
-                                appIcons.insert(selectedIndex!, draggedIcon!);
-                                draggedIcon = null;
-                                selectedIndex = null;
-                              }
-                              isDraggingOutside = false;
-                              hoveredIndex = null;
-                            });
-                          },
-                          child: DragTarget<int>(
-                            onWillAccept: (data) => true,
-                            onAccept: (draggedIndex) {
-                              _safePrint('Drop accepted at index $index');
-                              setState(() {
-                                appIcons.removeAt(selectedIndex!);
-                                if (draggedIcon != null) {
-                                  appIcons.insert(index, draggedIcon!);
-                                  draggedIcon = null;
-                                  selectedIndex = null;
-                                }
-                                hoveredIndex = null;
-                                isDraggingOutside = false;
-                              });
-                            },
-                            onMove: (details) {
-                              final RenderBox box =
-                                  context.findRenderObject() as RenderBox;
-                              final localPos =
-                                  box.globalToLocal(details.offset);
-                              setState(() {
-                                hoveredIndex = index;
-                                if (selectedIndex != null) {
-                                  final direction =
-                                      selectedIndex! < index ? -1 : 1;
-                                  for (int i = 0; i < appIcons.length; i++) {
-                                    iconOffsets[i] = (selectedIndex! < index &&
-                                                i > selectedIndex! &&
-                                                i <= index) ||
-                                            (selectedIndex! > index &&
-                                                i < selectedIndex! &&
-                                                i >= index)
-                                        ? Offset(direction * itemWidth, 0)
-                                        : Offset.zero;
-                                  }
-                                }
-                              });
-                            },
-                            onLeave: (data) => setState(() {
-                              hoveredIndex = null;
-                              iconOffsets.clear();
-                            }),
-                            builder: (context, candidateData, rejectedData) {
-                              final scale = getScale(index);
-                              final translateX = getTranslateX(index);
-
-                              return AnimatedContainer(
-                                height: 90,
-                                duration: Duration(milliseconds: 300),
-                                curve: Curves.easeOutExpo,
-                                transform: Matrix4.identity()
-                                  ..translate(translateX, 0)
-                                  ..translate(0.0, (1 - scale) * 40)
-                                  ..scale(scale),
-                                alignment: Alignment.bottomCenter,
-                                child: Container(
-                                  height: 85,
-                                  width: 85,
-                                  alignment: Alignment.center,
-                                  child: Image.asset(iconPath),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            MacDock<String>(
+              items: const [
+                'assets/icons/App Icon Finder.png',
+                'assets/icons/Apple Design Resources Bitmap.png',
+                'assets/icons/Mail App Icon.png',
+                'assets/icons/Swift Playgrounds App Icon.png',
+                'assets/icons/System Preferences App Icon.png'
+              ],
+              builder: (item, scale) {
+                return Center(
+                  child: Image.asset(
+                    item,
+                    height: 150 * scale * 0.8,
+                  ),
                 );
               },
             ),
-          ),
+            const SizedBox(
+              height: 32,
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class MacDock<T extends Object> extends StatefulWidget {
+  const MacDock({
+    super.key,
+    this.items = const [],
+    required this.builder,
+  });
+
+  final List<T> items;
+  final Widget Function(T item, double scale) builder;
+
+  @override
+  State<MacDock<T>> createState() => MacDockState<T>();
+}
+
+class MacDockState<T extends Object> extends State<MacDock<T>> {
+  late final List<T> items = widget.items.toList();
+  int? _hoveredIndex;
+  int? _draggedIndex;
+
+  static const double baseSize = 72.0;
+  static const double maxSize = 80.0;
+  static const double nonHoverMaxSize = 52.0;
+  static const double dragFeedbackScale = 0.6;
+
+  double calculatedItemValue({
+    required int index,
+    required double initVal,
+    required double maxVal,
+    required double nonHoverMaxVal,
+  }) {
+    if (_hoveredIndex == null) {
+      return initVal;
+    }
+
+    final distance = (_hoveredIndex! - index).abs();
+    final itemsAffected = items.length;
+
+    if (distance == 0) {
+      return maxVal;
+    } else if (distance == 1) {
+      return lerpDouble(initVal, maxVal, 0.75)!;
+    } else if (distance == 2) {
+      return lerpDouble(initVal, maxVal, 0.5)!;
+    } else if (distance < 3 && distance <= itemsAffected) {
+      return lerpDouble(initVal, nonHoverMaxVal, .25)!;
+    } else {
+      return initVal;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: Colors.black.withOpacity(0.2),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: items.asMap().entries.map((val) {
+          final index = val.key;
+          final item = val.value;
+
+          final calculatedSize = calculatedItemValue(
+            index: index,
+            initVal: baseSize,
+            maxVal: maxSize,
+            nonHoverMaxVal: nonHoverMaxSize,
+          );
+
+          return DragTarget<T>(
+            onAcceptWithDetails: (droppedItem) {
+              setState(() {
+                final draggedIndex = items.indexOf(droppedItem.data);
+                if (draggedIndex != -1) {
+                  items.removeAt(draggedIndex);
+                  items.insert(index, droppedItem.data);
+                }
+                _draggedIndex = null;
+              });
+            },
+            onWillAcceptWithDetails: (droppedItem) {
+              setState(() {
+                _hoveredIndex = index;
+                _draggedIndex = items.indexOf(droppedItem.data);
+              });
+              return true;
+            },
+            onLeave: (_) {
+              setState(() {
+                _hoveredIndex = null;
+                _draggedIndex = null;
+              });
+            },
+            builder: (context, candidateData, rejectedData) {
+              return Draggable<T>(
+                data: item,
+                feedback: Material(
+                  color: Colors.transparent,
+                  child: Transform.scale(
+                    scale: dragFeedbackScale,
+                    child: widget.builder(item, 1.0),
+                  ),
+                ),
+                childWhenDragging: const PlaceholderWidget(),
+                child: MouseRegion(
+                  onEnter: (_) {
+                    setState(() {
+                      _hoveredIndex = index;
+                    });
+                  },
+                  onExit: (_) {
+                    setState(() {
+                      _hoveredIndex = null;
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    transform: Matrix4.identity()
+                      ..translate(
+                        0.0,
+                        calculatedItemValue(
+                          index: index,
+                          initVal: 0,
+                          maxVal: -10,
+                          nonHoverMaxVal: -4,
+                        ),
+                        0.0,
+                      ),
+                    margin: EdgeInsets.only(
+                      left: _draggedIndex != null
+                          ? _hoveredIndex == index
+                              ? 64
+                              : 0
+                          : 0,
+                      right: _draggedIndex != null
+                          ? _hoveredIndex == index && index == items.length - 1
+                              ? 30
+                              : 0
+                          : 0,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    constraints: BoxConstraints(
+                      minWidth: nonHoverMaxSize,
+                      maxWidth: calculatedSize,
+                      maxHeight: calculatedSize,
+                    ),
+                    child: widget.builder(item, 1.0),
+                  ),
+                ),
+              );
+            },
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class PlaceholderWidget extends StatefulWidget {
+  const PlaceholderWidget({super.key});
+
+  @override
+  State<PlaceholderWidget> createState() => _PlaceholderWidgetState();
+}
+
+class _PlaceholderWidgetState extends State<PlaceholderWidget> {
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder(
+      duration: const Duration(milliseconds: 300),
+      tween: Tween<double>(begin: 48, end: 0),
+      builder: (BuildContext context, double value, Widget? child) {
+        return SizedBox(
+          width: value,
+          height: value,
+        );
+      },
     );
   }
 }
