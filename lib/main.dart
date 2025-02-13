@@ -26,7 +26,7 @@ class HomePage extends StatelessWidget {
       backgroundColor: Colors.deepPurpleAccent,
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             MacDock<String>(
@@ -79,6 +79,7 @@ class MacDockState<T extends Object> extends State<MacDock<T>> {
   static const double maxSize = 80.0;
   static const double nonHoverMaxSize = 52.0;
   static const double dragFeedbackScale = 0.6;
+  bool _isDragging = false;
 
   double calculatedItemValue({
     required int index,
@@ -86,7 +87,7 @@ class MacDockState<T extends Object> extends State<MacDock<T>> {
     required double maxVal,
     required double nonHoverMaxVal,
   }) {
-    if (_hoveredIndex == null) {
+    if (_hoveredIndex == null || _isDragging) {
       return initVal;
     }
 
@@ -135,6 +136,8 @@ class MacDockState<T extends Object> extends State<MacDock<T>> {
                   items.insert(index, droppedItem.data);
                 }
                 _draggedIndex = null;
+                _isDragging = false;
+                _hoveredIndex = null;
               });
             },
             onWillAcceptWithDetails: (droppedItem) {
@@ -153,6 +156,16 @@ class MacDockState<T extends Object> extends State<MacDock<T>> {
             builder: (context, candidateData, rejectedData) {
               return Draggable<T>(
                 data: item,
+                onDragStarted: () {
+                  setState(() {
+                    _isDragging = true;
+                  });
+                },
+                onDragEnd: (_) {
+                  setState(() {
+                    _isDragging = false;
+                  });
+                },
                 feedback: Material(
                   color: Colors.transparent,
                   child: Transform.scale(
@@ -226,7 +239,7 @@ class _PlaceholderWidgetState extends State<PlaceholderWidget> {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
       tween: Tween<double>(begin: 48, end: 0),
       builder: (BuildContext context, double value, Widget? child) {
         return SizedBox(
